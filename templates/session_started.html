@@ -1,10 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Session Started</title>
+  </head>
+  <body>
+    <h1>Session Started</h1>
 
-</body>
+    <p><b>Session ID:</b> {{ session["SESSIONID"] }}</p>
+    <p><b>Machine ID:</b> {{ session["MACHINEID"] }}</p>
+    <p><b>Student Name:</b> {{ session["FIRSTNAME"] }} {{ session["LASTNAME"] }}</p>
+    <p><b>Phone Number:</b> {{ session["PHONENUMBER"] }}</p>
+    <p><b>Time In:</b> {{ session["TIMEIN"] }}</p>
+    <p><b>Status:</b> {{ session["STATUS"] }}</p>
+
+    <p><a href="/machine/{{ session['MACHINEID'] }}/start">Back to machine start</a></p>
+  </body>
 </html>
