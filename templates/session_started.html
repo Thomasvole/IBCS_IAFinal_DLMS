@@ -12,6 +12,36 @@
     <p><b>Student Name:</b> {{ session["FIRSTNAME"] }} {{ session["LASTNAME"] }}</p>
     <p><b>Phone Number:</b> {{ session["PHONENUMBER"] }}</p>
     <p><b>Time In:</b> {{ session["TIMEIN"] }}</p>
+    <p><b>Expected End:</b> {{ expected_end }}</p>
+    <p><b>Time Remaining:</b> <span id="countdown">--:--</span></p>
+     <script>
+  const expectedEndEpoch = {{ expected_end_epoch }};
+  const countdownEl = document.getElementById("countdown");
+
+  function formatMMSS(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  }
+
+  function tick() {
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    const secondsLeft = expectedEndEpoch - nowEpoch;
+
+    if (secondsLeft <= 0) {
+      countdownEl.textContent = "00:00";
+      return false;
+    }
+
+    countdownEl.textContent = formatMMSS(secondsLeft);
+    return true;
+  }
+
+  tick();
+  const timer = setInterval(() => {
+    if (!tick()) clearInterval(timer);
+  }, 1000);
+</script>
     <p><b>Status:</b> {{ session["STATUS"] }}</p>
 
     <p><a href="/machine/{{ session['MACHINEID'] }}/start">Back to machine start</a></p>

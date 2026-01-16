@@ -1,11 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from db import insert_session, get_connection
 from helpers import ISVALIDMACHINEID, KEEPDIGITSONLY
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev"  # fine for IA demo; change later if needed
+CYCLE_DURATION_MINUTES = 30
 
 @app.route("/init-db")
 def init_db():
@@ -78,8 +79,12 @@ def session_page(session_id):
 
     if row is None:
         return "Session not found.", 404
+    time_in_dt = datetime.strptime(row["TIMEIN"], "%Y-%m-%d %H:%M:%S")
+    expected_end_dt = time_in_dt + timedelta(minutes=CYCLE_DURATION_MINUTES)
+    expected_end = expected_end_dt.strftime("%Y-%m-%d %H:%M:%S")
+    expected_end_epoch = int(expected_end_dt.timestamp())
 
-    return render_template("session_started.html", session=row)
+    return render_template("session_started.html", session=row, expected_end=expected_end, expected_end_epoch=expected_end_epoch)
 
 if __name__ == '__main__':
     app.run()
