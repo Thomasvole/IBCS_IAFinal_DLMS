@@ -20,3 +20,5 @@ instance/
 # IDE
 .idea/
 .vscode/
+
+.env
