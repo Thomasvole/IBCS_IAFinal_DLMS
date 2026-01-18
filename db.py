@@ -29,3 +29,53 @@ def insert_session(
         cur = conn.execute(sql, (machine_id, first_name, last_name, phone_number, time_in, status))
         conn.commit()
         return int(cur.lastrowid)
+
+def get_session_by_id(session_id: int) -> sqlite3.Row | None:
+    """
+    Returns one session row (including SC3 SMS fields) or None if not found.
+    """
+    sql = """
+        SELECT
+            SESSIONID, MACHINEID, FIRSTNAME, LASTNAME, PHONENUMBER, TIMEIN, STATUS,
+            FINISH_SMS_STATUS, FINISH_SMS_SENT_AT
+        FROM sessions
+        WHERE SESSIONID = ?
+    """
+    with get_connection() as conn:
+        return conn.execute(sql, (session_id,)).fetchone()
+
+
+def update_finish_sms(session_id: int, status_text: str, sent_at: str) -> None:
+    """
+    Updates SC3 finish SMS logging fields for a session.
+    """
+    sql = """
+        UPDATE sessions
+        SET FINISH_SMS_STATUS = ?, FINISH_SMS_SENT_AT = ?
+        WHERE SESSIONID = ?
+    """
+    with get_connection() as conn:
+        conn.execute(sql, (status_text, sent_at, session_id))
+        conn.commit()
+
+def get_session_by_id(session_id: int) -> sqlite3.Row | None:
+    sql = """
+        SELECT
+            SESSIONID, MACHINEID, FIRSTNAME, LASTNAME, PHONENUMBER, TIMEIN, STATUS,
+            FINISH_SMS_STATUS, FINISH_SMS_SENT_AT
+        FROM sessions
+        WHERE SESSIONID = ?
+    """
+    with get_connection() as conn:
+        return conn.execute(sql, (session_id,)).fetchone()
+
+
+def update_finish_sms(session_id: int, status_text: str, sent_at: str) -> None:
+    sql = """
+        UPDATE sessions
+        SET FINISH_SMS_STATUS = ?, FINISH_SMS_SENT_AT = ?
+        WHERE SESSIONID = ?
+    """
+    with get_connection() as conn:
+        conn.execute(sql, (status_text, sent_at, session_id))
+        conn.commit()
