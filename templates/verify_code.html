@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Verify Pickup</title>
+  </head>
+  <body>
+    <h1>Verify Pickup</h1>
+
+    <p><b>Machine:</b> {{ machine_id }}</p>
+
+    {% if error %}
+      <p style="color:red;"><b>{{ error }}</b></p>
+    {% endif %}
+
+    <form method="post" action="/machine/{{ machine_id }}/start">
+      <label for="code">Verification code:</label>
+      <input id="code" name="code" maxlength="6" required>
+      <button type="submit">Verify</button>
+    </form>
+
+
+    <p><a href="/machine/{{ machine_id }}/start">Back</a></p>
+  </body>
+</html>

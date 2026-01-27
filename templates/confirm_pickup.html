@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Confirm Pickup</title>
+  </head>
+  <body>
+    <h1>Confirm Pickup</h1>
+
+    <p>Your session for <b>{{ machine_id }}</b> is active.</p>
+    <p><b>Student:</b> {{ session["FIRSTNAME"] }} {{ session["LASTNAME"] }}</p>
+    <p><b>Time In:</b> {{ session["TIMEIN"] }}</p>
+
+    <form method="post" action="/session/{{ session['SESSIONID'] }}/pickup">
+      <button type="submit">End session (Pick up load)</button>
+    </form>
+
+    <p><a href="/machine/{{ machine_id }}/start">Cancel</a></p>
+  </body>
+</html>

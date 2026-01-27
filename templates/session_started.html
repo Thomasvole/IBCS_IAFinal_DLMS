@@ -13,78 +13,85 @@
     <p><b>Phone Number:</b> {{ session["PHONENUMBER"] }}</p>
     <p><b>Time In:</b> {{ session["TIMEIN"] }}</p>
     <p><b>Expected End:</b> {{ expected_end }}</p>
+
+    <!-- SC4: display the verification code for pickup -->
+    <p><b>Verification Code:</b> {{ session["VERIFICATION_CODE"] or "—" }}</p>
+
     <p><b>Time Remaining:</b> <span id="countdown">--:--</span></p>
     <p><b>Finish SMS Status:</b> <span id="smsStatus">{{ session["FINISH_SMS_STATUS"] or "Not sent" }}</span></p>
     <p><b>Finish Message:</b> <span id="smsPreview">—</span></p>
     <p><b>Finish SMS Sent At:</b> <span id="smsSentAt">{{ session["FINISH_SMS_SENT_AT"] or "—" }}</span></p>
-     <script>
-  const expectedEndEpoch = {{ expected_end_epoch }};
-  const sessionId = {{ session["SESSIONID"] }};
-  const countdownEl = document.getElementById("countdown");
 
-  const smsStatusEl = document.getElementById("smsStatus");
-  const smsSentAtEl = document.getElementById("smsSentAt");
-  const smsPreviewEl = document.getElementById("smsPreview");
+    <script>
+      const expectedEndEpoch = {{ expected_end_epoch }};
+      const sessionId = {{ session["SESSIONID"] }};
+      const countdownEl = document.getElementById("countdown");
 
-  let smsTriggered = false;
+      const smsStatusEl = document.getElementById("smsStatus");
+      const smsSentAtEl = document.getElementById("smsSentAt");
+      const smsPreviewEl = document.getElementById("smsPreview");
 
-  function formatMMSS(totalSeconds) {
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
-  }
+      let smsTriggered = false;
 
-  async function sendFinishSms() {
-    try {
-      const resp = await fetch(`/session/${sessionId}/send-finish-sms`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      const data = await resp.json();
-      if (data.message_preview) {
-        smsPreviewEl.textContent = data.message_preview;
+      function formatMMSS(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
       }
 
-      if (data.already_sent) {
-        smsStatusEl.textContent = data.finish_sms_status || "SENT";
-        smsSentAtEl.textContent = data.finish_sms_sent_at || "—";
-        return;
+      async function sendFinishSms() {
+        try {
+          const resp = await fetch(`/session/${sessionId}/send-finish-sms`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          });
+
+          const data = await resp.json();
+
+          if (data.message_preview) {
+            smsPreviewEl.textContent = data.message_preview;
+          }
+
+          if (data.already_sent) {
+            smsStatusEl.textContent = data.finish_sms_status || "SENT";
+            smsSentAtEl.textContent = data.finish_sms_sent_at || "—";
+            return;
+          }
+
+          smsStatusEl.textContent = data.finish_sms_status || (data.success ? "SENT" : "FAILED");
+          smsSentAtEl.textContent = data.finish_sms_sent_at || "—";
+        } catch (e) {
+          smsPreviewEl.textContent = "Could not load message preview.";
+          smsStatusEl.textContent = "FAILED:CLIENT_ERROR";
+          smsSentAtEl.textContent = new Date().toISOString().slice(0, 19).replace("T", " ");
+        }
       }
 
-      smsStatusEl.textContent = data.finish_sms_status || (data.success ? "SENT" : "FAILED");
-      smsSentAtEl.textContent = data.finish_sms_sent_at || "—";
-    } catch (e) {
-      smsPreviewEl.textContent = "Could not load message preview.";
-      smsStatusEl.textContent = "FAILED:CLIENT_ERROR";
-      smsSentAtEl.textContent = new Date().toISOString().slice(0, 19).replace("T", " ");
-    }
-  }
+      function tick() {
+        const nowEpoch = Math.floor(Date.now() / 1000);
+        const secondsLeft = expectedEndEpoch - nowEpoch;
 
-  function tick() {
-    const nowEpoch = Math.floor(Date.now() / 1000);
-    const secondsLeft = expectedEndEpoch - nowEpoch;
+        if (secondsLeft <= 0) {
+          countdownEl.textContent = "00:00";
 
-    if (secondsLeft <= 0) {
-      countdownEl.textContent = "00:00";
+          if (!smsTriggered) {
+            smsTriggered = true;
+            sendFinishSms();
+          }
 
-      if (!smsTriggered) {
-        smsTriggered = true;
-        sendFinishSms();
+          return false;
+        }
+
+        countdownEl.textContent = formatMMSS(secondsLeft);
+        return true;
       }
 
-      return false;
-    }
+      tick();
+      const timer = setInterval(() => {
+        if (!tick()) clearInterval(timer);
+      }, 1000);
+    </script>
 
-    countdownEl.textContent = formatMMSS(secondsLeft);
-    return true;
-  }
-
-  tick();
-  const timer = setInterval(() => {
-    if (!tick()) clearInterval(timer);
-  }, 1000);
-</script>
     <p><b>Status:</b> {{ session["STATUS"] }}</p>
 
     <p><a href="/machine/{{ session['MACHINEID'] }}/start">Back to machine start</a></p>

@@ -1,9 +1,22 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from datetime import datetime, timedelta
-from db import insert_session, get_connection, get_session_by_id, update_finish_sms
+import secrets
+import string
+
+from db import (
+    insert_session,
+    get_connection,
+    get_session_by_id,
+    update_finish_sms,
+    get_active_session_by_machine,
+    set_verification_code,
+    mark_picked_up,
+)
+
 from helpers import ISVALIDMACHINEID, KEEPDIGITSONLY
 from dotenv import load_dotenv
 load_dotenv()
+
 from sms_service import send_finish_sms as twilio_send_finish_sms, build_finish_message
 
 app = Flask(__name__)
@@ -21,6 +34,10 @@ def init_db():
 
     return "Database initialized."
 
+def generate_verification_code(length: int = 6) -> str:
+    digits = string.digits
+    return "".join(secrets.choice(digits) for _ in range(length))
+
 @app.route("/machine/<machine_id>/start", methods=["GET", "POST"])
 def start_load(machine_id):
     # Step 1: validate machine id
@@ -30,21 +47,40 @@ def start_load(machine_id):
     errors = []
     form_values = {"first_name": "", "last_name": "", "phone_number": ""}
 
-    # GET: show empty form
+    # Always check if this machine already has an active session
+    active = get_active_session_by_machine(machine_id)
+
+    # -------------------------
+    # GET: if active -> show verify, else -> show start form
+    # -------------------------
     if request.method == "GET":
+        if active is not None:
+            return render_template("verify_code.html", machine_id=machine_id, error=None)
         return render_template("machine_start.html", machine_id=machine_id, errors=errors, values=form_values)
 
-    # POST: extract inputs
+    # -------------------------
+    # POST: two possible actions
+    # A) active session exists -> treat POST as verification attempt
+    # B) no active session -> treat POST as starting a new session
+    # -------------------------
+    if active is not None:
+        entered = (request.form.get("code") or "").strip()
+        real = (active["VERIFICATION_CODE"] or "").strip()
+
+        if entered != real:
+            return render_template("verify_code.html", machine_id=machine_id, error="Incorrect verification code.")
+
+        return redirect(url_for("confirm_pickup", session_id=active["SESSIONID"]))
+
+    # Otherwise: normal “start session” POST
     first_name = (request.form.get("first_name") or "").strip()
     last_name = (request.form.get("last_name") or "").strip()
     phone_raw = request.form.get("phone_number") or ""
 
     form_values = {"first_name": first_name, "last_name": last_name, "phone_number": phone_raw}
 
-    # clean phone
     phone_clean = KEEPDIGITSONLY(phone_raw)
 
-    # validate
     if first_name == "":
         errors.append("First name is required.")
     if last_name == "":
@@ -52,11 +88,9 @@ def start_load(machine_id):
     if len(phone_clean) != 10:
         errors.append("Phone number must be exactly 10 digits.")
 
-    # if errors: show form again
     if len(errors) > 0:
         return render_template("machine_start.html", machine_id=machine_id, errors=errors, values=form_values)
 
-    # create session
     time_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     status = "active"
 
@@ -69,20 +103,29 @@ def start_load(machine_id):
         status=status
     )
 
+    code = generate_verification_code(6)
+    set_verification_code(session_id, code)
+
     return redirect(url_for("session_page", session_id=session_id))
 
 @app.route("/session/<int:session_id>")
 def session_page(session_id):
     row = get_session_by_id(session_id)
-
     if row is None:
         return "Session not found.", 404
+
     time_in_dt = datetime.strptime(row["TIMEIN"], "%Y-%m-%d %H:%M:%S")
     expected_end_dt = time_in_dt + timedelta(minutes=CYCLE_DURATION_MINUTES)
     expected_end = expected_end_dt.strftime("%Y-%m-%d %H:%M:%S")
     expected_end_epoch = int(expected_end_dt.timestamp())
 
-    return render_template("session_started.html", session=row, expected_end=expected_end, expected_end_epoch=expected_end_epoch)
+    return render_template(
+        "session_started.html",
+        session=row,
+        expected_end=expected_end,
+        expected_end_epoch=expected_end_epoch
+    )
+
 
 @app.route("/session/<int:session_id>/send-finish-sms", methods=["POST"])
 def send_finish_sms(session_id):
@@ -122,5 +165,30 @@ def send_finish_sms(session_id):
     }), 200
 
 
-if __name__ == '__main__':
+@app.route("/session/<int:session_id>/confirm-pickup")
+def confirm_pickup(session_id):
+    row = get_session_by_id(session_id)
+    if row is None:
+        return "Session not found.", 404
+
+    return render_template(
+        "confirm_pickup.html",
+        session=row,
+        machine_id=row["MACHINEID"]
+    )
+
+
+@app.route("/session/<int:session_id>/pickup", methods=["POST"])
+def pickup(session_id):
+    row = get_session_by_id(session_id)
+    if row is None:
+        return "Session not found.", 404
+
+    time_out = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    mark_picked_up(session_id, time_out)
+
+    return redirect(url_for("start_load", machine_id=row["MACHINEID"]))
+
+
+if __name__ == "__main__":
     app.run()
