@@ -7,6 +7,47 @@
   <body>
     <h1>Start Load for {{ machine_id }}</h1>
 
+    <!-- SC5: machine state display -->
+    {% if machine %}
+      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
+        <strong>Machine State</strong><br>
+        Occupancy: {{ machine["OCCUPANCY_STATUS"] }}<br>
+        Condition: {{ machine["CONDITION_STATUS"] }}<br>
+        Last condition update: {{ machine["LAST_CONDITION_UPDATE"] or "N/A" }}<br>
+        {% if machine["LAST_CONDITION_REASON"] %}
+          Last reason: {{ machine["LAST_CONDITION_REASON"] }}<br>
+        {% endif %}
+      </div>
+
+      <!-- SC5: report broken / resolve with supervisor code on student screen -->
+      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
+        <strong>Boarding Parent Verification Required</strong><br><br>
+
+        <form method="post" action="{{ url_for('change_machine_condition', machine_id=machine_id) }}">
+          {% if machine["CONDITION_STATUS"] == "normal" %}
+            <input type="hidden" name="action" value="REPORT_BROKEN">
+            <button type="submit">Report Broken</button>
+          {% else %}
+            <input type="hidden" name="action" value="RESOLVE_ISSUE">
+            <button type="submit">Resolve Issue</button>
+          {% endif %}
+
+          <br><br>
+
+          <label>Reason (optional)</label><br>
+          <input type="text" name="reason"><br><br>
+
+          <label>Supervisor Code</label><br>
+          <input type="password" name="supervisor_code" required><br><br>
+
+        </form>
+
+        <div style="margin-top:8px; font-size: 0.95em;">
+          If the code is invalid, the machine condition will not change.
+        </div>
+      </div>
+    {% endif %}
+
     {% if errors and errors|length > 0 %}
       <div style="border:1px solid #c00; padding:10px; margin-bottom:10px;">
         <strong>Please fix the errors below:</strong>
@@ -18,6 +59,7 @@
       </div>
     {% endif %}
 
+    <!-- existing start form -->
     <form method="post">
       <label>First Name</label><br>
       <input type="text" name="first_name" value="{{ values.first_name }}"><br><br>

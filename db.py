@@ -109,3 +109,61 @@ def mark_picked_up(session_id: int, time_out: str) -> None:
     with get_connection() as conn:
         conn.execute(sql, (time_out, session_id))
         conn.commit()
+
+from datetime import datetime
+
+def ensure_machine_exists(machine_id: str) -> None:
+    """
+    Creates a machine row if it doesn't exist yet (SC5/SC6).
+    Default: vacant + normal.
+    """
+    sql = """
+        INSERT OR IGNORE INTO machines (MACHINEID, OCCUPANCY_STATUS, CONDITION_STATUS)
+        VALUES (?, 'vacant', 'normal')
+    """
+    with get_connection() as conn:
+        conn.execute(sql, (machine_id,))
+        conn.commit()
+
+
+def get_machine_by_id(machine_id: str) -> sqlite3.Row | None:
+    sql = """
+        SELECT
+            MACHINEID,
+            OCCUPANCY_STATUS,
+            CONDITION_STATUS,
+            LAST_CONDITION_UPDATE,
+            LAST_CONDITION_REASON
+        FROM machines
+        WHERE MACHINEID = ?
+    """
+    with get_connection() as conn:
+        return conn.execute(sql, (machine_id,)).fetchone()
+
+
+def set_machine_occupied(machine_id: str) -> None:
+    sql = "UPDATE machines SET OCCUPANCY_STATUS = 'occupied' WHERE MACHINEID = ?"
+    with get_connection() as conn:
+        conn.execute(sql, (machine_id,))
+        conn.commit()
+
+
+def set_machine_vacant(machine_id: str) -> None:
+    sql = "UPDATE machines SET OCCUPANCY_STATUS = 'vacant' WHERE MACHINEID = ?"
+    with get_connection() as conn:
+        conn.execute(sql, (machine_id,))
+        conn.commit()
+
+
+def update_machine_condition(machine_id: str, new_condition: str, reason: str | None) -> None:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sql = """
+        UPDATE machines
+        SET CONDITION_STATUS = ?,
+            LAST_CONDITION_UPDATE = ?,
+            LAST_CONDITION_REASON = ?
+        WHERE MACHINEID = ?
+    """
+    with get_connection() as conn:
+        conn.execute(sql, (new_condition, now, reason, machine_id))
+        conn.commit()
