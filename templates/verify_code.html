@@ -2,65 +2,120 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Verify Pickup</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verify Pickup - {{ machine_id }}</title>
   </head>
-  <body>
-    <h1>Verify Pickup</h1>
 
-    <p><b>Machine:</b> {{ machine_id }}</p>
+  <body style="font-family: Arial, sans-serif; margin:0; padding:0; background:#f7f7f7;">
+    <div style="max-width:520px; margin:0 auto; padding:16px;">
 
-    <!-- SC5: machine state display -->
-    {% if machine %}
-      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
-        <strong>Machine State</strong><br>
-        Occupancy: {{ machine["OCCUPANCY_STATUS"] }}<br>
-        Condition: {{ machine["CONDITION_STATUS"] }}<br>
-        Last condition update: {{ machine["LAST_CONDITION_UPDATE"] or "N/A" }}<br>
-        {% if machine["LAST_CONDITION_REASON"] %}
-          Last reason: {{ machine["LAST_CONDITION_REASON"] }}<br>
-        {% endif %}
+      <!-- Header -->
+      <div style="text-align:center; padding:12px 8px;">
+        <div style="font-size:34px; font-weight:700; letter-spacing:1px;">DLMS</div>
+        <div style="margin-top:6px; font-size:16px;">Machine: <b>{{ machine_id }}</b></div>
+        <div style="margin-top:8px; font-size:18px; font-weight:700;">Verify Pickup</div>
       </div>
 
-      <!-- SC5: allow report/resolve at any time (even during active session) -->
-      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
-        <strong>Boarding Parent Verification Required (Condition Change)</strong><br><br>
+      <!-- Machine State -->
+      {% if machine %}
+        <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+          <div style="font-weight:700; margin-bottom:10px;">Machine State</div>
 
-        <form method="post" action="{{ url_for('change_machine_condition', machine_id=machine_id) }}">
-          {% if machine["CONDITION_STATUS"] == "normal" %}
-            <input type="hidden" name="action" value="REPORT_BROKEN">
-            <button type="submit">Report Broken</button>
-          {% else %}
-            <input type="hidden" name="action" value="RESOLVE_ISSUE">
-            <button type="submit">Resolve Issue</button>
+          <div style="font-size:14px; line-height:1.6;">
+            <div><b>Occupancy:</b> {{ machine["OCCUPANCY_STATUS"] }}</div>
+            <div><b>Condition:</b> {{ machine["CONDITION_STATUS"] }}</div>
+            <div><b>Last update:</b> {{ machine["LAST_CONDITION_UPDATE"] or "N/A" }}</div>
+            {% if machine["LAST_CONDITION_REASON"] %}
+              <div><b>Reason:</b> {{ machine["LAST_CONDITION_REASON"] }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Optional SC6 timestamps (kept but de-emphasized) -->
+          {% if machine["PROBLEM_REPORTED_AT"] or machine["PROBLEM_RESOLVED_AT"] %}
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+              <div style="font-weight:700; font-size:13px; margin-bottom:6px;">Diagnostics</div>
+              <div style="font-size:13px; color:#444; line-height:1.6;">
+                {% if machine["PROBLEM_REPORTED_AT"] %}
+                  <div><b>Problem reported:</b> {{ machine["PROBLEM_REPORTED_AT"] }}</div>
+                {% endif %}
+                {% if machine["PROBLEM_RESOLVED_AT"] %}
+                  <div><b>Problem resolved:</b> {{ machine["PROBLEM_RESOLVED_AT"] }}</div>
+                {% endif %}
+              </div>
+            </div>
           {% endif %}
+        </div>
 
-          <br><br>
+        <!-- Condition Change -->
+        <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+          <div style="font-weight:700; margin-bottom:10px;">Condition Change</div>
+          <div style="font-size:13px; color:#444; margin-bottom:10px;">
+            Supervisor code is required to report or resolve machine issues.
+          </div>
 
-          <label>Reason (optional)</label><br>
-          <input type="text" name="reason"><br><br>
+          <form method="post" action="{{ url_for('change_machine_condition', machine_id=machine_id) }}" style="margin:0;">
+            {% if machine["CONDITION_STATUS"] == "normal" %}
+              <input type="hidden" name="action" value="REPORT_BROKEN">
+              <button type="submit" style="width:100%; padding:10px; font-weight:700;">
+                Report Broken
+              </button>
+            {% else %}
+              <input type="hidden" name="action" value="RESOLVE_ISSUE">
+              <button type="submit" style="width:100%; padding:10px; font-weight:700;">
+                Resolve Issue
+              </button>
+            {% endif %}
 
-          <label>Supervisor Code</label><br>
-          <input type="password" name="supervisor_code" required><br><br>
+            <div style="margin-top:10px;">
+              <label style="font-size:13px;"><b>Reason (optional)</b></label><br>
+              <input type="text" name="reason" style="width:100%; padding:10px; box-sizing:border-box;">
+            </div>
 
-          <button type="submit">Confirm Change</button>
+            <div style="margin-top:10px;">
+              <label style="font-size:13px;"><b>Supervisor Code</b></label><br>
+              <input type="password" name="supervisor_code" required style="width:100%; padding:10px; box-sizing:border-box;">
+            </div>
+          </form>
+
+          <div style="margin-top:8px; font-size:13px; color:#444;">
+            If the code is invalid, the machine condition will not change.
+          </div>
+        </div>
+      {% endif %}
+
+      <!--bug fix: show error box on invalid pickup OR invalid supervisor code -->
+      {% if error %}
+        <div style="background:#fff; border:1px solid #c00; border-radius:10px; padding:14px; margin-bottom:12px;">
+          <div style="font-weight:700; color:#c00;">{{ error }}</div>
+        </div>
+      {% endif %}
+
+      <!-- Student Pickup Verification -->
+      <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:10px;">Student Pickup Verification</div>
+
+        <form method="post" action="/machine/{{ machine_id }}/start" style="margin:0;">
+          <label for="code" style="font-size:13px;"><b>Verification code</b></label><br>
+          <input id="code" name="code" maxlength="6" required
+                 style="width:100%; padding:10px; box-sizing:border-box; margin-top:6px;">
+          <button type="submit" style="width:100%; padding:10px; font-weight:700; margin-top:10px;">
+            Verify
+          </button>
         </form>
 
-        <div style="margin-top:8px; font-size: 0.95em;">
-          If the code is invalid, the machine condition will not change.
+        <div style="margin-top:8px; font-size:13px; color:#444;">
+          Enter the code shown on the session screen to confirm pickup.
+          If you forgot the verification code, a boarding parent can enter the supervisor code.
         </div>
       </div>
-    {% endif %}
 
-    {% if error %}
-      <p style="color:red;"><b>{{ error }}</b></p>
-    {% endif %}
+      <!-- Back -->
+      <div style="text-align:center; margin-top:10px;">
+        <a href="/machine/{{ machine_id }}/start" style="color:#1a0dab; text-decoration:none; font-weight:700;">
+          Back
+        </a>
+      </div>
 
-    <form method="post" action="/machine/{{ machine_id }}/start">
-      <label for="code">Verification code:</label>
-      <input id="code" name="code" maxlength="6" required>
-      <button type="submit">Verify</button>
-    </form>
-
-    <p><a href="/machine/{{ machine_id }}/start">Back</a></p>
+    </div>
   </body>
 </html>

@@ -14,12 +14,15 @@ from db import (
     set_verification_code,
     mark_picked_up,
 
-    # SC5/SC6 additions
+    # SC5/SC6
     ensure_machine_exists,
     get_machine_by_id,
     set_machine_occupied,
     set_machine_vacant,
     update_machine_condition,
+
+    # SC6 summary
+    get_machine_summary_stats,
 )
 
 from helpers import ISVALIDMACHINEID, KEEPDIGITSONLY
@@ -30,7 +33,10 @@ from sms_service import send_finish_sms as twilio_send_finish_sms, build_finish_
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev"  # fine for IA demo; change later if needed
+
 CYCLE_DURATION_MINUTES = 1
+GRACE_MINUTES = 6  # SC6: grace period before delay is recorded
+
 SUPERVISOR_CODE = os.getenv("SUPERVISOR_CODE", "767877")  # predetermined
 
 
@@ -95,18 +101,21 @@ def start_load(machine_id):
         entered = (request.form.get("code") or "").strip()
         real = (active["VERIFICATION_CODE"] or "").strip()
 
-        if entered != real:
+        # Accept either the session verification code (student) OR the supervisor code (boarding parent override).
+        ok_student = hmac.compare_digest(str(entered), str(real))
+        ok_supervisor = hmac.compare_digest(str(entered), str(SUPERVISOR_CODE))
+
+        if not (ok_student or ok_supervisor):
             return render_template(
                 "verify_code.html",
                 machine_id=machine_id,
                 machine=machine,
-                error="Incorrect verification code."
+                error="Incorrect code."
             )
 
         return redirect(url_for("confirm_pickup", session_id=active["SESSIONID"]))
 
-    # IMPORTANT (SC6): Only block STARTING NEW loads if machine is broken.
-    # Do NOT block verification/pickup for an existing active session.
+    # IMPORTANT (SC5/SC6): Only block STARTING NEW loads if machine is broken.
     if machine is not None and machine["CONDITION_STATUS"] == "broken":
         return render_template(
             "machine_start.html",
@@ -122,7 +131,6 @@ def start_load(machine_id):
     phone_raw = request.form.get("phone_number") or ""
 
     form_values = {"first_name": first_name, "last_name": last_name, "phone_number": phone_raw}
-
     phone_clean = KEEPDIGITSONLY(phone_raw)
 
     if first_name == "":
@@ -141,7 +149,13 @@ def start_load(machine_id):
             values=form_values
         )
 
-    time_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # SC6: record TIMEIN + store EXPECTED_END at creation
+    time_in_dt = datetime.now()
+    time_in = time_in_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    expected_end_dt = time_in_dt + timedelta(minutes=CYCLE_DURATION_MINUTES)
+    expected_end = expected_end_dt.strftime("%Y-%m-%d %H:%M:%S")
+
     status = "active"
 
     session_id = insert_session(
@@ -150,6 +164,7 @@ def start_load(machine_id):
         last_name=last_name,
         phone_number=phone_clean,
         time_in=time_in,
+        expected_end=expected_end,  # SC6
         status=status
     )
 
@@ -177,7 +192,7 @@ def change_machine_condition(machine_id):
         return "Invalid action.", 400
 
     # Boarding parent verification gate (predetermined code)
-    if not hmac.compare_digest(code_in, SUPERVISOR_CODE):
+    if not hmac.compare_digest(str(code_in), str(SUPERVISOR_CODE)):
         machine = get_machine_by_id(machine_id)
         active = get_active_session_by_machine(machine_id)
         msg = "Invalid supervisor code — condition not changed."
@@ -199,6 +214,8 @@ def change_machine_condition(machine_id):
         )
 
     new_condition = "broken" if action == "REPORT_BROKEN" else "normal"
+
+    # SC5: condition update; SC6: db.py stamps problem timestamps too
     update_machine_condition(machine_id, new_condition, reason)
 
     return redirect(url_for("start_load", machine_id=machine_id))
@@ -210,9 +227,9 @@ def session_page(session_id):
     if row is None:
         return "Session not found.", 404
 
-    time_in_dt = datetime.strptime(row["TIMEIN"], "%Y-%m-%d %H:%M:%S")
-    expected_end_dt = time_in_dt + timedelta(minutes=CYCLE_DURATION_MINUTES)
-    expected_end = expected_end_dt.strftime("%Y-%m-%d %H:%M:%S")
+    # SC6: use stored EXPECTED_END
+    expected_end = row["EXPECTED_END"]
+    expected_end_dt = datetime.strptime(expected_end, "%Y-%m-%d %H:%M:%S")
     expected_end_epoch = int(expected_end_dt.timestamp())
 
     return render_template(
@@ -266,10 +283,21 @@ def confirm_pickup(session_id):
     if row is None:
         return "Session not found.", 404
 
+    # SC6: show delay preview using grace rule
+    expected_end_dt = datetime.strptime(row["EXPECTED_END"], "%Y-%m-%d %H:%M:%S")
+    now_dt = datetime.now()
+
+    late_by_min = max(0, int((now_dt - expected_end_dt).total_seconds() // 60))
+    delay_recorded = max(0, late_by_min - GRACE_MINUTES)
+
     return render_template(
         "confirm_pickup.html",
         session=row,
-        machine_id=row["MACHINEID"]
+        machine_id=row["MACHINEID"],
+        now_str=now_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        late_by_min=late_by_min,
+        grace_min=GRACE_MINUTES,
+        delay_recorded=delay_recorded
     )
 
 
@@ -279,13 +307,65 @@ def pickup(session_id):
     if row is None:
         return "Session not found.", 404
 
-    time_out = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    mark_picked_up(session_id, time_out)
+    time_out_dt = datetime.now()
+    time_out = time_out_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    # SC6: compute delay with 6-minute grace
+    expected_end_dt = datetime.strptime(row["EXPECTED_END"], "%Y-%m-%d %H:%M:%S")
+    late_by_min = max(0, int((time_out_dt - expected_end_dt).total_seconds() // 60))
+    delay_min = max(0, late_by_min - GRACE_MINUTES)
+
+    mark_picked_up(session_id, time_out, delay_min)
 
     # SC5: update occupancy when load finishes
     set_machine_vacant(row["MACHINEID"])
 
     return redirect(url_for("start_load", machine_id=row["MACHINEID"]))
+
+
+@app.route("/machine/<machine_id>/summary-login", methods=["GET", "POST"])
+def summary_login(machine_id):
+    if not ISVALIDMACHINEID(machine_id):
+        return "Invalid machine ID.", 400
+
+    ensure_machine_exists(machine_id)
+    machine = get_machine_by_id(machine_id)
+
+    error = None
+
+    if request.method == "POST":
+        code_in = (request.form.get("supervisor_code") or "").strip()
+
+        if hmac.compare_digest(str(code_in), str(SUPERVISOR_CODE)):
+            return redirect(url_for("machine_summary", machine_id=machine_id))
+
+        error = "Invalid supervisor code."
+
+    return render_template(
+        "summary_login.html",
+        machine_id=machine_id,
+        machine=machine,
+        error=error
+    )
+
+
+@app.route("/machine/<machine_id>/summary")
+def machine_summary(machine_id):
+    if not ISVALIDMACHINEID(machine_id):
+        return "Invalid machine ID.", 400
+
+    ensure_machine_exists(machine_id)
+    machine = get_machine_by_id(machine_id)
+
+    stats = get_machine_summary_stats(machine_id)
+
+    return render_template(
+        "summary.html",
+        machine_id=machine_id,
+        machine=machine,
+        stats=stats,
+        grace_min=GRACE_MINUTES
+    )
 
 
 if __name__ == "__main__":

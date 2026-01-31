@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Summary Login</title>
+  </head>
+  <body>
+    <h1>DLMS</h1>
+    <h2>Boarding Parent Verification</h2>
+
+    <p><b>Machine:</b> {{ machine_id }}</p>
+
+    {% if machine %}
+      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
+        <strong>Machine State</strong><br>
+        Occupancy: {{ machine["OCCUPANCY_STATUS"] }}<br>
+        Condition: {{ machine["CONDITION_STATUS"] }}<br>
+        Last condition update: {{ machine["LAST_CONDITION_UPDATE"] or "N/A" }}<br>
+        {% if machine["LAST_CONDITION_REASON"] %}
+          Last reason: {{ machine["LAST_CONDITION_REASON"] }}<br>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if error %}
+      <p style="color:red;"><b>{{ error }}</b></p>
+    {% endif %}
+
+    <form method="post">
+      <label for="supervisor_code">Supervisor code:</label><br>
+      <input id="supervisor_code" name="supervisor_code" type="password" required>
+      <button type="submit">View Summary</button>
+    </form>
+
+    <p><a href="/machine/{{ machine_id }}/start">Back</a></p>
+  </body>
+</html>

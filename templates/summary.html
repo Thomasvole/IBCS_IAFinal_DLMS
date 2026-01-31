@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Machine Summary - {{ machine_id }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 720px; margin: 18px auto; padding: 0 14px; }
+      h1 { margin: 0 0 6px 0; }
+      .muted { color: #333; font-size: 0.95em; }
+      .card { border: 1px solid #999; padding: 12px; margin: 12px 0; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .kv p { margin: 6px 0; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+      th { background: #f2f2f2; }
+      .pill { display: inline-block; padding: 2px 8px; border: 1px solid #666; border-radius: 999px; font-size: 0.9em; }
+      .right { text-align: right; }
+    </style>
+  </head>
+
+  <body>
+    <h1>DLMS Summary</h1>
+    <p class="muted">
+      <b>Machine:</b> {{ machine_id }} &nbsp; | &nbsp;
+      <b>Grace period:</b> {{ grace_min }} minutes
+    </p>
+
+    {% macro pretty_minutes(m) -%}
+      {%- if m is none -%}
+        N/A
+      {%- else -%}
+        {%- set minutes = m|float -%}
+        {%- if minutes < 60 -%}
+          {{ minutes|round(2) }} min
+        {%- else -%}
+          {{ minutes|round(2) }} min (≈ {{ (minutes/60)|round(2) }} hr)
+        {%- endif -%}
+      {%- endif -%}
+    {%- endmacro %}
+
+    <!-- Machine state -->
+    <div class="card kv">
+      <h2 style="margin-top:0;">Machine State</h2>
+      <div class="grid">
+        <p><b>Occupancy:</b>
+          <span class="pill">{{ machine["OCCUPANCY_STATUS"] }}</span>
+        </p>
+        <p><b>Condition:</b>
+          <span class="pill">{{ machine["CONDITION_STATUS"] }}</span>
+        </p>
+      </div>
+
+      {% if machine["LAST_CONDITION_UPDATE"] %}
+        <p class="muted"><b>Last update:</b> {{ machine["LAST_CONDITION_UPDATE"] }}</p>
+      {% endif %}
+      {% if machine["LAST_CONDITION_REASON"] %}
+        <p class="muted"><b>Reason:</b> {{ machine["LAST_CONDITION_REASON"] }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Session stats -->
+    <div class="card">
+      <h2 style="margin-top:0;">Session Statistics (this machine)</h2>
+      <div class="grid kv">
+        <p><b>Total sessions:</b> {{ stats["total_sessions"] }}</p>
+        <p><b>Late pickups:</b> {{ stats["late_count"] }}</p>
+        <p><b>Average delay:</b> {{ pretty_minutes(stats["avg_delay"]) }}</p>
+        <p><b>Max delay:</b> {{ pretty_minutes(stats["max_delay"]) }}</p>
+      </div>
+    </div>
+
+    <!-- Repair / issue stats -->
+    <div class="card">
+      <h2 style="margin-top:0;">Machine Issues</h2>
+
+      <div class="grid kv">
+        <p><b>Problem reported?</b>
+          {% if machine["PROBLEM_REPORTED_AT"] %}Yes{% else %}No{% endif %}
+        </p>
+
+        <p><b>Repair time (if resolved):</b> {{ pretty_minutes(stats["repair_min"]) }}</p>
+      </div>
+
+      <div class="kv">
+        <p class="muted"><b>Reported at:</b> {{ machine["PROBLEM_REPORTED_AT"] or "N/A" }}</p>
+        <p class="muted"><b>Resolved at:</b> {{ machine["PROBLEM_RESOLVED_AT"] or "N/A" }}</p>
+      </div>
+    </div>
+
+    <!-- Recent sessions (optional but useful + not cluttered) -->
+    <div class="card">
+      <h2 style="margin-top:0;">Recent Sessions (last 10)</h2>
+
+      {% if stats["recent_sessions"] and stats["recent_sessions"]|length > 0 %}
+        <table>
+          <thead>
+            <tr>
+              <th class="right">ID</th>
+              <th>Time In</th>
+              <th>Expected End</th>
+              <th>Time Out</th>
+              <th class="right">Delay</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in stats["recent_sessions"] %}
+              <tr>
+                <td class="right">{{ s["SESSIONID"] }}</td>
+                <td>{{ s["TIMEIN"] }}</td>
+                <td>{{ s["EXPECTED_END"] }}</td>
+                <td>{{ s["TIMEOUT"] or "—" }}</td>
+                <td class="right">{{ pretty_minutes(s["DELAY_MIN"]) }}</td>
+                <td>{{ s["STATUS"] }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted">No sessions recorded for this machine yet.</p>
+      {% endif %}
+    </div>
+
+    <p><a href="/machine/{{ machine_id }}/start">← Back to machine</a></p>
+  </body>
+</html>

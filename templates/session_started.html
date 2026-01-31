@@ -12,7 +12,9 @@
     <p><b>Student Name:</b> {{ session["FIRSTNAME"] }} {{ session["LASTNAME"] }}</p>
     <p><b>Phone Number:</b> {{ session["PHONENUMBER"] }}</p>
     <p><b>Time In:</b> {{ session["TIMEIN"] }}</p>
-    <p><b>Expected End:</b> {{ expected_end }}</p>
+
+    <!-- SC6: show stored expected end -->
+    <p><b>Expected End:</b> {{ session["EXPECTED_END"] or expected_end }}</p>
 
     <!-- SC4: display the verification code for pickup -->
     <p><b>Verification Code:</b> {{ session["VERIFICATION_CODE"] or "—" }}</p>
@@ -93,6 +95,11 @@
     </script>
 
     <p><b>Status:</b> {{ session["STATUS"] }}</p>
+
+    <!-- Boarding parent gate to summary -->
+    <form method="get" action="/machine/{{ session['MACHINEID'] }}/summary-login">
+      <button type="submit">View Summary</button>
+    </form>
 
     <p><a href="/machine/{{ session['MACHINEID'] }}/start">Back to machine start</a></p>
   </body>

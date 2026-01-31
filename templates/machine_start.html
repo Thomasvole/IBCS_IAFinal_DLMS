@@ -2,75 +2,138 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Start Load - {{ machine_id }}</title>
   </head>
-  <body>
-    <h1>Start Load for {{ machine_id }}</h1>
+  <body style="font-family: Arial, sans-serif; margin:0; padding:0; background:#f7f7f7;">
+    <div style="max-width:520px; margin:0 auto; padding:16px;">
 
-    <!-- SC5: machine state display -->
-    {% if machine %}
-      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
-        <strong>Machine State</strong><br>
-        Occupancy: {{ machine["OCCUPANCY_STATUS"] }}<br>
-        Condition: {{ machine["CONDITION_STATUS"] }}<br>
-        Last condition update: {{ machine["LAST_CONDITION_UPDATE"] or "N/A" }}<br>
-        {% if machine["LAST_CONDITION_REASON"] %}
-          Last reason: {{ machine["LAST_CONDITION_REASON"] }}<br>
-        {% endif %}
+      <!-- Header -->
+      <div style="text-align:center; padding:12px 8px;">
+        <div style="font-size:34px; font-weight:700; letter-spacing:1px;">DLMS</div>
+        <div style="margin-top:6px; font-size:16px;">Machine: <b>{{ machine_id }}</b></div>
       </div>
 
-      <!-- SC5: report broken / resolve with supervisor code on student screen -->
-      <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
-        <strong>Boarding Parent Verification Required</strong><br><br>
+      <!-- Boarding Parent Tools -->
+      <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:10px;">Boarding Parent Tools</div>
 
-        <form method="post" action="{{ url_for('change_machine_condition', machine_id=machine_id) }}">
-          {% if machine["CONDITION_STATUS"] == "normal" %}
-            <input type="hidden" name="action" value="REPORT_BROKEN">
-            <button type="submit">Report Broken</button>
-          {% else %}
-            <input type="hidden" name="action" value="RESOLVE_ISSUE">
-            <button type="submit">Resolve Issue</button>
-          {% endif %}
-
-          <br><br>
-
-          <label>Reason (optional)</label><br>
-          <input type="text" name="reason"><br><br>
-
-          <label>Supervisor Code</label><br>
-          <input type="password" name="supervisor_code" required><br><br>
-
+        <form method="get" action="/machine/{{ machine_id }}/summary-login" style="margin:0;">
+          <button type="submit" style="width:100%; padding:10px; font-weight:700;">
+            View Machine Summary
+          </button>
         </form>
 
-        <div style="margin-top:8px; font-size: 0.95em;">
-          If the code is invalid, the machine condition will not change.
+        <div style="margin-top:8px; font-size:13px; color:#444;">
+          Summary access requires supervisor code on the next screen.
         </div>
       </div>
-    {% endif %}
 
-    {% if errors and errors|length > 0 %}
-      <div style="border:1px solid #c00; padding:10px; margin-bottom:10px;">
-        <strong>Please fix the errors below:</strong>
-        <ul>
-          {% for e in errors %}
-            <li>{{ e }}</li>
-          {% endfor %}
-        </ul>
+      <!-- Machine State -->
+      {% if machine %}
+        <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+          <div style="font-weight:700; margin-bottom:10px;">Machine State</div>
+
+          <div style="font-size:14px; line-height:1.6;">
+            <div><b>Occupancy:</b> {{ machine["OCCUPANCY_STATUS"] }}</div>
+            <div><b>Condition:</b> {{ machine["CONDITION_STATUS"] }}</div>
+            <div><b>Last update:</b> {{ machine["LAST_CONDITION_UPDATE"] or "N/A" }}</div>
+            {% if machine["LAST_CONDITION_REASON"] %}
+              <div><b>Reason:</b> {{ machine["LAST_CONDITION_REASON"] }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Optional SC6 timestamps (kept, but visually de-emphasized) -->
+          {% if machine["PROBLEM_REPORTED_AT"] or machine["PROBLEM_RESOLVED_AT"] %}
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+              <div style="font-weight:700; font-size:13px; margin-bottom:6px;">Diagnostics</div>
+              <div style="font-size:13px; color:#444; line-height:1.6;">
+                {% if machine["PROBLEM_REPORTED_AT"] %}
+                  <div><b>Problem reported:</b> {{ machine["PROBLEM_REPORTED_AT"] }}</div>
+                {% endif %}
+                {% if machine["PROBLEM_RESOLVED_AT"] %}
+                  <div><b>Problem resolved:</b> {{ machine["PROBLEM_RESOLVED_AT"] }}</div>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Condition Change -->
+        <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+          <div style="font-weight:700; margin-bottom:10px;">Condition Change</div>
+          <div style="font-size:13px; color:#444; margin-bottom:10px;">
+            Supervisor code is required to report or resolve machine issues.
+          </div>
+
+          <form method="post" action="{{ url_for('change_machine_condition', machine_id=machine_id) }}" style="margin:0;">
+            {% if machine["CONDITION_STATUS"] == "normal" %}
+              <input type="hidden" name="action" value="REPORT_BROKEN">
+              <button type="submit" style="width:100%; padding:10px; font-weight:700;">
+                Report Broken
+              </button>
+            {% else %}
+              <input type="hidden" name="action" value="RESOLVE_ISSUE">
+              <button type="submit" style="width:100%; padding:10px; font-weight:700;">
+                Resolve Issue
+              </button>
+            {% endif %}
+
+            <div style="margin-top:10px;">
+              <label style="font-size:13px;"><b>Reason (optional)</b></label><br>
+              <input type="text" name="reason" style="width:100%; padding:10px; box-sizing:border-box;">
+            </div>
+
+            <div style="margin-top:10px;">
+              <label style="font-size:13px;"><b>Supervisor Code</b></label><br>
+              <input type="password" name="supervisor_code" required style="width:100%; padding:10px; box-sizing:border-box;">
+            </div>
+          </form>
+
+          <div style="margin-top:8px; font-size:13px; color:#444;">
+            If the code is invalid, the machine condition will not change.
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Errors -->
+      {% if errors and errors|length > 0 %}
+        <div style="background:#fff; border:1px solid #c00; border-radius:10px; padding:14px; margin-bottom:12px;">
+          <div style="font-weight:700; color:#c00; margin-bottom:8px;">Please fix the errors below:</div>
+          <ul style="margin:0; padding-left:18px;">
+            {% for e in errors %}
+              <li>{{ e }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- Student Start Session -->
+      <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:10px;">Start a New Session</div>
+
+        <form method="post" style="margin:0;">
+          <div style="margin-bottom:10px;">
+            <label style="font-size:13px;"><b>First Name</b></label><br>
+            <input type="text" name="first_name" value="{{ values.first_name }}" style="width:100%; padding:10px; box-sizing:border-box;">
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <label style="font-size:13px;"><b>Last Name</b></label><br>
+            <input type="text" name="last_name" value="{{ values.last_name }}" style="width:100%; padding:10px; box-sizing:border-box;">
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="font-size:13px;"><b>Phone Number</b></label><br>
+            <input type="text" name="phone_number" value="{{ values.phone_number }}" style="width:100%; padding:10px; box-sizing:border-box;">
+          </div>
+
+          <button type="submit" style="width:100%; padding:10px; font-weight:700;">
+            Start Load
+          </button>
+        </form>
       </div>
-    {% endif %}
 
-    <!-- existing start form -->
-    <form method="post">
-      <label>First Name</label><br>
-      <input type="text" name="first_name" value="{{ values.first_name }}"><br><br>
-
-      <label>Last Name</label><br>
-      <input type="text" name="last_name" value="{{ values.last_name }}"><br><br>
-
-      <label>Phone Number</label><br>
-      <input type="text" name="phone_number" value="{{ values.phone_number }}"><br><br>
-
-      <button type="submit">Start Load</button>
-    </form>
+    </div>
   </body>
 </html>
