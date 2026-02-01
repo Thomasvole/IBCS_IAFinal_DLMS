@@ -14,7 +14,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 # -----------------------------
-# Sessions (SC1-SC6)
+# Sessions (SC1-SC6): session records, verification, and timestamps.
 # -----------------------------
 
 def insert_session(
@@ -23,7 +23,7 @@ def insert_session(
     last_name: str,
     phone_number: str,
     time_in: str,
-    expected_end: str,   # SC6
+    expected_end: str,   # SC2/SC6: expected end time stored with the session.
     status: str
 ) -> int:
     """
@@ -130,7 +130,7 @@ def mark_picked_up(session_id: int, time_out: str, delay_min: int) -> None:
 
 
 # -----------------------------
-# Machines (SC5-SC6)
+# Machines (SC5-SC6): occupancy/condition state and problem timestamps.
 # -----------------------------
 
 def ensure_machine_exists(machine_id: str) -> None:
@@ -218,7 +218,7 @@ def update_machine_condition(machine_id: str, new_condition: str, reason: str | 
 
 
 # -----------------------------
-# Summary stats (SC6)
+# Summary stats (SC6): aggregates for delays and repair time.
 # -----------------------------
 
 def get_machine_summary_stats(machine_id: str) -> dict:
@@ -244,14 +244,14 @@ def get_machine_summary_stats(machine_id: str) -> dict:
         avg_delay = row["avgd"] or 0
         max_delay = row["maxd"] or 0
 
-        # This machine: has it been reported broken?
+        # SC5/SC6: check whether this machine has an open problem report.
         m = conn.execute("""
             SELECT PROBLEM_REPORTED_AT, PROBLEM_RESOLVED_AT
             FROM machines
             WHERE MACHINEID = ?
         """, (machine_id,)).fetchone()
 
-        # repair time for THIS machine (if resolved)
+        # SC6: compute repair time for this machine if resolved.
         repair_min = 0
         if m and m["PROBLEM_REPORTED_AT"] and m["PROBLEM_RESOLVED_AT"]:
             rep = conn.execute("""
@@ -262,12 +262,18 @@ def get_machine_summary_stats(machine_id: str) -> dict:
             repair_min = rep or 0
 
         recent_sessions = conn.execute("""
-            SELECT SESSIONID, TIMEIN, EXPECTED_END, TIMEOUT, DELAY_MIN, STATUS
-            FROM sessions
-            WHERE MACHINEID = ?
-            ORDER BY SESSIONID DESC
-            LIMIT 10
-        """, (machine_id,)).fetchall()
+                                       SELECT SESSIONID,
+                                              FIRSTNAME,
+                                              LASTNAME,
+                                              TIMEIN,
+                                              EXPECTED_END,
+                                              TIMEOUT,
+                                              DELAY_MIN,
+                                              STATUS
+                                       FROM sessions
+                                       WHERE MACHINEID = ?
+                                       ORDER BY SESSIONID DESC LIMIT 10
+                                       """, (machine_id,)).fetchall()
 
     return {
         "total_sessions": int(total_sessions),

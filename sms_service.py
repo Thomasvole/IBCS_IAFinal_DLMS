@@ -5,9 +5,9 @@ def to_e164_us(phone10: str) -> str:
     return "+1" + phone10
 
 def format_machine_location(machine_id: str) -> str:
-    floor_code = machine_id[0]   # M or F
-    hall = machine_id[1]         # A-D
-    num = int(machine_id[2])     # 1-8
+    floor_code = machine_id[0]   # SC3: floor code (M/F) parsed from machine ID.
+    hall = machine_id[1]         # SC3: hallway letter parsed from machine ID.
+    num = int(machine_id[2])     # SC3: machine number parsed from machine ID.
 
     floor_text = "third floor (Boys)" if floor_code == "M" else "second floor (Girls)"
     machine_type = "washing machine" if 1 <= num <= 4 else "drying machine"
@@ -57,7 +57,7 @@ def send_finish_sms(phone10: str, machine_id: str) -> dict:
             data = resp.json()
             return {"success": True, "sid": data.get("sid", "SM_UNKNOWN")}
         else:
-            # Twilio usually returns JSON with message/code
+            # SC3: Twilio errors usually return JSON with message/code.
             try:
                 err = resp.json()
                 code = err.get("code")

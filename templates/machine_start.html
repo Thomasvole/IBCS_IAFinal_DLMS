@@ -8,13 +8,13 @@
   <body style="font-family: Arial, sans-serif; margin:0; padding:0; background:#f7f7f7;">
     <div style="max-width:520px; margin:0 auto; padding:16px;">
 
-      <!-- Header -->
+      <!-- SC1: header for starting a session after scanning a machine QR. -->
       <div style="text-align:center; padding:12px 8px;">
         <div style="font-size:34px; font-weight:700; letter-spacing:1px;">DLMS</div>
         <div style="margin-top:6px; font-size:16px;">Machine: <b>{{ machine_id }}</b></div>
       </div>
 
-      <!-- Boarding Parent Tools -->
+      <!-- SC6: supervisor tools for summary statistics access. -->
       <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
         <div style="font-weight:700; margin-bottom:10px;">Boarding Parent Tools</div>
 
@@ -29,7 +29,7 @@
         </div>
       </div>
 
-      <!-- Machine State -->
+       <!-- SC5: show machine occupancy/condition state. -->
       {% if machine %}
         <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="font-weight:700; margin-bottom:10px;">Machine State</div>
@@ -43,7 +43,7 @@
             {% endif %}
           </div>
 
-          <!-- Optional SC6 timestamps (kept, but visually de-emphasized) -->
+          <!-- SC6: optional problem timestamps for issue tracking. -->
           {% if machine["PROBLEM_REPORTED_AT"] or machine["PROBLEM_RESOLVED_AT"] %}
             <div style="margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
               <div style="font-weight:700; font-size:13px; margin-bottom:6px;">Diagnostics</div>
@@ -59,7 +59,7 @@
           {% endif %}
         </div>
 
-        <!-- Condition Change -->
+        <!-- SC5: supervisor condition change (report/resolve issues). -->
         <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="font-weight:700; margin-bottom:10px;">Condition Change</div>
           <div style="font-size:13px; color:#444; margin-bottom:10px;">
@@ -96,7 +96,7 @@
         </div>
       {% endif %}
 
-      <!-- Errors -->
+      <!-- SC1: validation errors for student input fields. -->
       {% if errors and errors|length > 0 %}
         <div style="background:#fff; border:1px solid #c00; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="font-weight:700; color:#c00; margin-bottom:8px;">Please fix the errors below:</div>
@@ -108,7 +108,7 @@
         </div>
       {% endif %}
 
-      <!-- Student Start Session -->
+      <!-- SC1: student form to start a new laundry session. -->
       <div style="background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; margin-bottom:12px;">
         <div style="font-weight:700; margin-bottom:10px;">Start a New Session</div>
 

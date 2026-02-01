@@ -38,7 +38,7 @@
       {%- endif -%}
     {%- endmacro %}
 
-    <!-- Machine state -->
+    <!-- SC5: machine occupancy/condition state summary. -->
     <div class="card kv">
       <h2 style="margin-top:0;">Machine State</h2>
       <div class="grid">
@@ -58,7 +58,7 @@
       {% endif %}
     </div>
 
-    <!-- Session stats -->
+    <!-- SC6: session statistics derived from recorded timestamps/delays. -->
     <div class="card">
       <h2 style="margin-top:0;">Session Statistics (this machine)</h2>
       <div class="grid kv">
@@ -69,7 +69,7 @@
       </div>
     </div>
 
-    <!-- Repair / issue stats -->
+    <!-- SC5/SC6: machine issue tracking and repair duration. -->
     <div class="card">
       <h2 style="margin-top:0;">Machine Issues</h2>
 
@@ -87,7 +87,7 @@
       </div>
     </div>
 
-    <!-- Recent sessions (optional but useful + not cluttered) -->
+    <!-- SC6: recent sessions table using recorded timestamps/delays. -->
     <div class="card">
       <h2 style="margin-top:0;">Recent Sessions (last 10)</h2>
 
@@ -96,6 +96,7 @@
           <thead>
             <tr>
               <th class="right">ID</th>
+              <th>Student</th>
               <th>Time In</th>
               <th>Expected End</th>
               <th>Time Out</th>
@@ -107,6 +108,9 @@
             {% for s in stats["recent_sessions"] %}
               <tr>
                 <td class="right">{{ s["SESSIONID"] }}</td>
+                <td>
+                    {{ s["FIRSTNAME"] }} {{ s["LASTNAME"] }}
+                </td>
                 <td>{{ s["TIMEIN"] }}</td>
                 <td>{{ s["EXPECTED_END"] }}</td>
                 <td>{{ s["TIMEOUT"] or "—" }}</td>

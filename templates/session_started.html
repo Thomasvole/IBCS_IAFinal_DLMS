@@ -13,10 +13,10 @@
     <p><b>Phone Number:</b> {{ session["PHONENUMBER"] }}</p>
     <p><b>Time In:</b> {{ session["TIMEIN"] }}</p>
 
-    <!-- SC6: show stored expected end -->
+    <!-- SC2/SC6: show stored expected end time for the active session. -->
     <p><b>Expected End:</b> {{ session["EXPECTED_END"] or expected_end }}</p>
 
-    <!-- SC4: display the verification code for pickup -->
+    <!-- SC4: display the verification code required for pickup. -->
     <p><b>Verification Code:</b> {{ session["VERIFICATION_CODE"] or "—" }}</p>
 
     <p><b>Time Remaining:</b> <span id="countdown">--:--</span></p>
@@ -96,7 +96,7 @@
 
     <p><b>Status:</b> {{ session["STATUS"] }}</p>
 
-    <!-- Boarding parent gate to summary -->
+    <!-- SC6: supervisor-only summary access for machine stats. -->
     <form method="get" action="/machine/{{ session['MACHINEID'] }}/summary-login">
       <button type="submit">View Summary</button>
     </form>

@@ -14,14 +14,12 @@ from db import (
     set_verification_code,
     mark_picked_up,
 
-    # SC5/SC6
     ensure_machine_exists,
     get_machine_by_id,
     set_machine_occupied,
     set_machine_vacant,
     update_machine_condition,
 
-    # SC6 summary
     get_machine_summary_stats,
 )
 
@@ -32,12 +30,12 @@ load_dotenv()
 from sms_service import send_finish_sms as twilio_send_finish_sms, build_finish_message
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "dev"  # fine for IA demo; change later if needed
+app.config["SECRET_KEY"] = "dev"
 
-CYCLE_DURATION_MINUTES = 1
-GRACE_MINUTES = 6  # SC6: grace period before delay is recorded
+CYCLE_DURATION_MINUTES = 60
+GRACE_MINUTES = 6  # SC6: grace period used when calculating pickup delay.
 
-SUPERVISOR_CODE = os.getenv("SUPERVISOR_CODE", "767877")  # predetermined
+SUPERVISOR_CODE = os.getenv("SUPERVISOR_CODE", "767877")  # SC4/SC5: supervisor override for pickup/condition updates.
 
 
 @app.route("/init-db")
@@ -59,23 +57,21 @@ def generate_verification_code(length: int = 6) -> str:
 
 @app.route("/machine/<machine_id>/start", methods=["GET", "POST"])
 def start_load(machine_id):
-    # Step 1: validate machine id
+    # SC1: validate machine ID from the QR-based route.
     if not ISVALIDMACHINEID(machine_id):
         return "Invalid machine ID.", 400
 
-    # SC5: ensure machine row exists + fetch state
+    # SC5: ensure machine row exists and load occupancy/condition state.
     ensure_machine_exists(machine_id)
     machine = get_machine_by_id(machine_id)
 
     errors = []
     form_values = {"first_name": "", "last_name": "", "phone_number": ""}
 
-    # Always check if this machine already has an active session
+    # SC4: check for an active session to require verification on re-scan.
     active = get_active_session_by_machine(machine_id)
 
-    # -------------------------
-    # GET: if active -> show verify, else -> show start form
-    # -------------------------
+    # SC1/SC4: GET shows verify screen if active session exists, otherwise start form.
     if request.method == "GET":
         if active is not None:
             return render_template(
@@ -92,16 +88,12 @@ def start_load(machine_id):
             values=form_values
         )
 
-    # -------------------------
-    # POST: two possible actions
-    # A) active session exists -> treat POST as verification attempt (SC4)
-    # B) no active session -> treat POST as starting a new session (SC5/SC6)
-    # -------------------------
+    # SC4 vs SC1/SC2/SC5/SC6: POST verifies pickup for active sessions or starts a new session.
     if active is not None:
         entered = (request.form.get("code") or "").strip()
         real = (active["VERIFICATION_CODE"] or "").strip()
 
-        # Accept either the session verification code (student) OR the supervisor code (boarding parent override).
+        # SC4: accept session verification code or supervisor override for pickup.
         ok_student = hmac.compare_digest(str(entered), str(real))
         ok_supervisor = hmac.compare_digest(str(entered), str(SUPERVISOR_CODE))
 
@@ -115,7 +107,7 @@ def start_load(machine_id):
 
         return redirect(url_for("confirm_pickup", session_id=active["SESSIONID"]))
 
-    # IMPORTANT (SC5/SC6): Only block STARTING NEW loads if machine is broken.
+    # SC5: block starting new loads when the machine condition is broken.
     if machine is not None and machine["CONDITION_STATUS"] == "broken":
         return render_template(
             "machine_start.html",
@@ -125,7 +117,7 @@ def start_load(machine_id):
             values=form_values,
         )
 
-    # Otherwise: normal “start session” POST
+    # SC1: collect student info and start a new session.
     first_name = (request.form.get("first_name") or "").strip()
     last_name = (request.form.get("last_name") or "").strip()
     phone_raw = request.form.get("phone_number") or ""
@@ -149,7 +141,7 @@ def start_load(machine_id):
             values=form_values
         )
 
-    # SC6: record TIMEIN + store EXPECTED_END at creation
+    # SC2/SC6: record time in and calculate/store expected end time.
     time_in_dt = datetime.now()
     time_in = time_in_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -171,7 +163,7 @@ def start_load(machine_id):
     code = generate_verification_code(6)
     set_verification_code(session_id, code)
 
-    # SC5: update occupancy when load starts
+    # SC5: mark machine occupied when a load starts.
     set_machine_occupied(machine_id)
 
     return redirect(url_for("session_page", session_id=session_id))
@@ -184,14 +176,14 @@ def change_machine_condition(machine_id):
 
     ensure_machine_exists(machine_id)
 
-    action = request.form.get("action")  # REPORT_BROKEN or RESOLVE_ISSUE
+    action = request.form.get("action")  # SC5: report broken or resolve issue action.
     code_in = (request.form.get("supervisor_code") or "").strip()
     reason = (request.form.get("reason") or "").strip() or None
 
     if action not in ("REPORT_BROKEN", "RESOLVE_ISSUE"):
         return "Invalid action.", 400
 
-    # Boarding parent verification gate (predetermined code)
+    # SC5: require supervisor code to change machine condition.
     if not hmac.compare_digest(str(code_in), str(SUPERVISOR_CODE)):
         machine = get_machine_by_id(machine_id)
         active = get_active_session_by_machine(machine_id)
@@ -215,7 +207,7 @@ def change_machine_condition(machine_id):
 
     new_condition = "broken" if action == "REPORT_BROKEN" else "normal"
 
-    # SC5: condition update; SC6: db.py stamps problem timestamps too
+    # SC5/SC6: update condition status and stamp problem timestamps.
     update_machine_condition(machine_id, new_condition, reason)
 
     return redirect(url_for("start_load", machine_id=machine_id))
@@ -227,7 +219,7 @@ def session_page(session_id):
     if row is None:
         return "Session not found.", 404
 
-    # SC6: use stored EXPECTED_END
+    # SC2: use stored expected end to drive the countdown timer.
     expected_end = row["EXPECTED_END"]
     expected_end_dt = datetime.strptime(expected_end, "%Y-%m-%d %H:%M:%S")
     expected_end_epoch = int(expected_end_dt.timestamp())
@@ -283,7 +275,7 @@ def confirm_pickup(session_id):
     if row is None:
         return "Session not found.", 404
 
-    # SC6: show delay preview using grace rule
+    # SC6: show delay preview using grace rule.
     expected_end_dt = datetime.strptime(row["EXPECTED_END"], "%Y-%m-%d %H:%M:%S")
     now_dt = datetime.now()
 
@@ -310,14 +302,14 @@ def pickup(session_id):
     time_out_dt = datetime.now()
     time_out = time_out_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    # SC6: compute delay with 6-minute grace
+    # SC6: compute delay with 6-minute grace.
     expected_end_dt = datetime.strptime(row["EXPECTED_END"], "%Y-%m-%d %H:%M:%S")
     late_by_min = max(0, int((time_out_dt - expected_end_dt).total_seconds() // 60))
     delay_min = max(0, late_by_min - GRACE_MINUTES)
 
     mark_picked_up(session_id, time_out, delay_min)
 
-    # SC5: update occupancy when load finishes
+    # SC5: update occupancy when a load finishes
     set_machine_vacant(row["MACHINEID"])
 
     return redirect(url_for("start_load", machine_id=row["MACHINEID"]))

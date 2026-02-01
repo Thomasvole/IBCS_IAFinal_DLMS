@@ -8,7 +8,7 @@ CREATE TABLE machines (
     LAST_CONDITION_UPDATE TEXT,
     LAST_CONDITION_REASON TEXT,
 
-    -- SC6 additions: problem timestamps
+     -- SC6: problem timestamps for issue tracking.
     PROBLEM_REPORTED_AT TEXT,
     PROBLEM_RESOLVED_AT TEXT
 );
@@ -20,7 +20,7 @@ CREATE TABLE sessions (
     LASTNAME TEXT NOT NULL,
     PHONENUMBER TEXT NOT NULL CHECK (length(PHONENUMBER) = 10),
 
-    -- SC6: session timestamps
+     -- SC2/SC6: session timestamps for expected end and delay calculations.
     TIMEIN TEXT NOT NULL,
     EXPECTED_END TEXT NOT NULL,
 
@@ -29,7 +29,7 @@ CREATE TABLE sessions (
     FINISH_SMS_SENT_AT TEXT,
     VERIFICATION_CODE TEXT,
 
-    -- SC4/SC6: completion + delay
+    -- SC4/SC6: pickup completion time and delay minutes.
     TIMEOUT TEXT,
     DELAY_MIN INTEGER NOT NULL DEFAULT 0 CHECK (DELAY_MIN >= 0),
 
