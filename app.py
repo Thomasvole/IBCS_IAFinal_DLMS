@@ -32,7 +32,7 @@ from sms_service import send_finish_sms as twilio_send_finish_sms, build_finish_
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev"
 
-CYCLE_DURATION_MINUTES = 60
+CYCLE_DURATION_MINUTES = 1
 GRACE_MINUTES = 6  # SC6: grace period used when calculating pickup delay.
 
 SUPERVISOR_CODE = os.getenv("SUPERVISOR_CODE", "767877")  # SC4/SC5: supervisor override for pickup/condition updates.
@@ -238,7 +238,7 @@ def send_finish_sms(session_id):
     if row is None:
         return jsonify({"error": "Session not found"}), 404
 
-    message_preview = build_finish_message(row["MACHINEID"])
+    message_preview = build_finish_message(row["MACHINEID"], row["FIRSTNAME"])
 
     current_status = row["FINISH_SMS_STATUS"] or ""
     if current_status.startswith("SENT"):
@@ -250,7 +250,7 @@ def send_finish_sms(session_id):
         }), 200
 
     sent_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    result = twilio_send_finish_sms(row["PHONENUMBER"], row["MACHINEID"])
+    result = twilio_send_finish_sms(row["PHONENUMBER"], row["MACHINEID"], row["FIRSTNAME"])
 
     if result["success"]:
         status_text = f"SENT:{result['sid']}"

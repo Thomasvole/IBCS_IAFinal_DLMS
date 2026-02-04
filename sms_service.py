@@ -14,15 +14,22 @@ def format_machine_location(machine_id: str) -> str:
 
     return f"{machine_type} {num} in hallway {hall}, {floor_text}"
 
-def build_finish_message(machine_id: str) -> str:
+def build_finish_message(machine_id: str, first_name: str | None = None) -> str:
     location = format_machine_location(machine_id)
+
+    greeting = ""
+    if first_name:
+        safe_name = first_name.strip().title()
+        greeting = f"Hello {safe_name}, "
+
     return (
-        "Your session is done. Please go to "
+        f"{greeting}your session is done. Please go to "
         f"{location} to pick up your load. "
         "Don't forget to check your belongings and report any issues to the boarding parent."
     )
 
-def send_finish_sms(phone10: str, machine_id: str) -> dict:
+
+def send_finish_sms(phone10: str, machine_id: str, first_name: str | None = None) -> dict:
     """
     Returns:
       { "success": True, "sid": "SM..." }
@@ -41,7 +48,7 @@ def send_finish_sms(phone10: str, machine_id: str) -> dict:
 
     to_number = to_e164_us(phone10)
     location = format_machine_location(machine_id)
-    body = build_finish_message(machine_id)
+    body = build_finish_message(machine_id, first_name)
 
     url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
 
